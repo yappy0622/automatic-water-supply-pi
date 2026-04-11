@@ -1,0 +1,13 @@
+# === 必須 (Phase 1) ===
+pyserial>=3.5
+PyYAML>=6.0
+
+# === Spreadsheet連携 (Phase 2: google_sheets.enabled: true で必要) ===
+gspread>=5.0
+google-auth>=2.0
+
+# === 将来用 ===
+# matplotlib          # グラフ生成 (Phase 3)
+# requests            # Discord Webhook 通知 (Phase 2)
+# opencv-python       # USBカメラ (Phase 3)
+# schedule            # 高機能スケジューラ (必要に応じて)
