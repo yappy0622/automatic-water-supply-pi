@@ -39,11 +39,13 @@ state = {
     "soil_base": [450, 430], # ベースライン土壌湿度
     "temperature": 25.0,
     "humidity": 60.0,
+    "light_lux": 500.0,     # 照度 (lux)
+    "ec_value": 1.2,        # EC (mS/cm) 土壌電気伝導度
 }
 
 PUMP_TIMEOUT = 60  # 秒
 FW_NAME = "WateringDriver"
-FW_VERSION = "1.0.0"
+FW_VERSION = "1.2.0"
 
 
 def simulate_soil() -> list[int]:
@@ -86,6 +88,17 @@ def process_command(cmd: str) -> str:
     elif cmd == "READ_WATER":
         return f"WATER:{state['water_level']}"
 
+    elif cmd == "READ_LIGHT":
+        # 照度シミュレーション (0 - 10000 lux)
+        lux = state["light_lux"] + random.uniform(-20.0, 20.0)
+        lux = max(0.0, lux)
+        return f"LIGHT:{lux:.1f}"
+
+    elif cmd == "READ_EC":
+        ec = state["ec_value"] + random.uniform(-0.05, 0.05)
+        ec = max(0.0, ec)
+        return f"EC:{ec:.2f}"
+
     elif cmd == "READ_DHT":
         temp = state["temperature"] + random.uniform(-0.5, 0.5)
         hum = state["humidity"] + random.uniform(-2.0, 2.0)
@@ -97,7 +110,11 @@ def process_command(cmd: str) -> str:
         temp = state["temperature"] + random.uniform(-0.5, 0.5)
         hum = state["humidity"] + random.uniform(-2.0, 2.0)
         pump_str = "ON" if state["pump"] else "OFF"
-        return f"SOIL:{soil_str};WATER:{state['water_level']};DHT:{temp:.1f},{hum:.1f};PUMP:{pump_str}"
+        lux = state["light_lux"] + random.uniform(-20.0, 20.0)
+        lux = max(0.0, lux)
+        ec = state["ec_value"] + random.uniform(-0.05, 0.05)
+        ec = max(0.0, ec)
+        return f"SOIL:{soil_str};WATER:{state['water_level']};DHT:{temp:.1f},{hum:.1f};LIGHT:{lux:.1f};EC:{ec:.2f};PUMP:{pump_str}"
 
     elif cmd == "PUMP_ON":
         if state["water_level"] == 0:
@@ -147,6 +164,10 @@ def run_mock(link_path: str = "/tmp/mock_arduino"):
     print("  water_full   - 水位を「正常」に戻す")
     print("  dry          - 土壌を「乾燥」状態にする (値: 200台)")
     print("  wet          - 土壌を「湿潤」状態にする (値: 600台)")
+    print("  bright       - 照度を「明るい」に (値: 5000 lux)")
+    print("  dark         - 照度を「暗い」に (値: 50 lux)")
+    print("  ec_high      - ECを「高い」に (値: 3.0 mS/cm)")
+    print("  ec_low       - ECを「低い」に (値: 0.3 mS/cm)")
     print("  quit         - 終了")
     print()
     print("待機中... (ラズパイ側から接続してください)")
@@ -214,6 +235,18 @@ def run_mock(link_path: str = "/tmp/mock_arduino"):
                 elif user_input == "wet":
                     state["soil_base"] = [620, 600]
                     print("  >> 土壌: 湿潤 (600台)")
+                elif user_input == "bright":
+                    state["light_lux"] = 5000.0
+                    print("  >> 照度: 明るい (5000 lux)")
+                elif user_input == "dark":
+                    state["light_lux"] = 50.0
+                    print("  >> 照度: 暗い (50 lux)")
+                elif user_input == "ec_high":
+                    state["ec_value"] = 3.0
+                    print("  >> EC: 高い (3.0 mS/cm)")
+                elif user_input == "ec_low":
+                    state["ec_value"] = 0.3
+                    print("  >> EC: 低い (0.3 mS/cm)")
                 elif user_input == "quit":
                     running = False
                 elif user_input:

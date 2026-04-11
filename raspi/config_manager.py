@@ -41,7 +41,9 @@ class WateringConfig:
 class ScheduleConfig:
     watering_times: list[str] = field(default_factory=lambda: ["07:00", "19:00"])
     sensor_interval_min: int = 30
-    sheets_poll_interval_min: int = 5
+    sheets_poll_interval_min: int = 30
+    main_loop_sleep_sec: int = 30
+    graph_interval_hours: int = 6
 
 
 @dataclass

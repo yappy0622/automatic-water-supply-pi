@@ -23,6 +23,13 @@ Thumbs.db
 
 # Logs
 *.log
+raspi/logs/
+
+# Generated graphs
+raspi/graphs/
+
+# CSV data files (generated at runtime)
+raspi/logs/*.csv
 
 # Secrets
 *.env

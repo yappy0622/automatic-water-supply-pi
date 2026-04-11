@@ -142,13 +142,15 @@ class SheetsClient:
         water_ok: bool,
         temperature: Optional[float],
         humidity: Optional[float],
+        light_lux: Optional[float] = None,
+        ec_value: Optional[float] = None,
         pump_status: str = "--",
         note: str = "",
     ) -> None:
         """
         「センサーログ」シートに1行追記。
 
-        列構成: タイムスタンプ | 土壌1 | 土壌2 | 水位 | 温度 | 湿度 | ポンプ | 備考
+        列構成: タイムスタンプ | 土壌1 | 土壌2 | 水位 | 温度 | 湿度 | 照度 | EC | ポンプ | 備考
         """
         try:
             ws = self._get_sheet("sensor_log")
@@ -160,6 +162,8 @@ class SheetsClient:
                 "1" if water_ok else "0",
                 f"{temperature:.1f}" if temperature is not None else "ERR",
                 f"{humidity:.1f}" if humidity is not None else "ERR",
+                f"{light_lux:.0f}" if light_lux is not None else "",
+                f"{ec_value:.2f}" if ec_value is not None else "",
                 pump_status,
                 note,
             ]
