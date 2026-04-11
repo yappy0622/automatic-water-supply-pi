@@ -33,6 +33,21 @@
 
 ---
 
+## 1.5 使用ハードウェア
+
+| 部品 | 型番・仕様 | 備考 |
+|------|-----------|------|
+| マイコン (制御) | **Raspberry Pi 5 (8GB RAM)** | WiFi/LAN でインターネット接続 |
+| マイコン (I/O) | **Arduino Nano 互換 (USB Type-C)** | ATmega328P, 5V |
+| 土壌湿度センサー | 静電容量式 ×2 | アナログ出力 (A0, A1) |
+| 水位センサー | フロートスイッチ ×1 | デジタル入力 (D2) |
+| 温湿度センサー | DHT22 ×1 | デジタル入力 (D4) |
+| ポンプ制御 | ラッチリレー | デジタル出力 (D7) |
+| 給水ポンプ | USB給水ポンプ | リレー経由で制御 |
+| 接続ケーブル | USB (Type-C) | Raspberry Pi ⇔ Arduino |
+
+---
+
 ## 2. 設計思想
 
 ### 基本方針: Arduino = 最小限のドライバ / Raspberry Pi = すべての知能
@@ -316,60 +331,65 @@ def watering_check():
 
 ```
 arduino/
-├── watering_driver.ino    # メインファームウェア (コマンド処理ループ)
-└── config.h               # ピン定義、タイムアウト値
+└── watering_driver/
+    ├── watering_driver.ino    # メインファームウェア (コマンド処理ループ)
+    └── config.h               # ピン定義、タイムアウト値
 ```
 
 ### 9.2 Raspberry Pi 側 (Python)
 
 ```
 raspi/
-├── main.py                # エントリポイント (スケジューラ起動)
-├── config.yaml            # ローカル設定 (デフォルト値)
+├── main.py                    # エントリポイント (スケジューラ + メインループ)
+├── config.yaml                # ローカル設定 (デフォルト値)
+├── config_manager.py          # 設定管理 (yaml読込 + Sheetsマージ)
+├── requirements.txt           # Python 依存パッケージ
 │
 ├── arduino/
-│   ├── serial_driver.py   # シリアル通信ドライバ (コマンド送受信)
-│   └── commands.py        # コマンド定義・パーサー
+│   ├── __init__.py
+│   └── serial_driver.py       # シリアル通信ドライバ (コマンド送受信)
 │
 ├── logic/
-│   ├── watering.py        # 給水判定ロジック
-│   └── scheduler.py       # 定時実行スケジューラ
+│   ├── __init__.py
+│   └── watering.py            # 給水判定・実行ロジック
 │
 ├── external/
-│   ├── sheets.py          # Google Spreadsheet 読み書き
-│   ├── discord_notify.py  # Discord通知
-│   └── camera.py          # USBカメラ撮影
+│   ├── __init__.py
+│   ├── sheets.py              # Google Spreadsheet 読み書き
+│   ├── discord_notify.py      # Discord通知 (Phase 2)
+│   └── camera.py              # USBカメラ撮影 (Phase 3)
 │
 ├── data/
-│   ├── logger.py          # ログ記録
-│   └── grapher.py         # グラフ生成 (matplotlib)
+│   ├── __init__.py
+│   ├── logger.py              # ログ設定 (ローテーション付き)
+│   └── grapher.py             # グラフ生成 (Phase 3)
 │
 └── tests/
-    ├── test_serial.py     # シリアル通信テスト
-    ├── test_watering.py   # 給水ロジックテスト
-    └── mock_arduino.py    # Arduinoモック (開発用)
+    ├── __init__.py
+    ├── test_serial.py         # シリアル通信テスト
+    └── mock_arduino.py        # Arduinoモック (開発用)
 ```
 
 ---
 
 ## 10. 優先度別 実装ロードマップ
 
-### Phase 1: 最小動作 (MVP)
-> 目標: 自動で水やりができる
+### Phase 1: 最小動作 + Spreadsheet 連携
+> 目標: 自動で水やりができ、スマホから監視・設定変更ができる
 
-- [ ] Arduino ファームウェア (A1~A6, A9)
-- [ ] ラズパイ シリアルドライバ (R1)
-- [ ] 給水判定ロジック (R3)
-- [ ] スケジューラ (R4)
-- [ ] ローカル設定ファイル (R7)
-- [ ] ローカルログ (R12)
+- [x] Arduino ファームウェア (A1~A10)
+- [x] ラズパイ シリアルドライバ (R1)
+- [x] 給水判定ロジック (R3)
+- [x] スケジューラ + メインループ (R4)
+- [x] ローカル設定ファイル + Sheets マージ (R7)
+- [x] ローカルログ (R12)
+- [x] Google Spreadsheet 連携 (R5, R6)
+- [x] 手動給水コマンド (R13)
 
-### Phase 2: 外部連携
-> 目標: スマホから監視・設定変更ができる
+### Phase 2: 通知・アラート
+> 目標: 異常時に即座に知らせてくれる
 
-- [ ] Google Spreadsheet 連携 (R5, R6)
 - [ ] Discord / LINE 通知 (R8)
-- [ ] 手動給水コマンド (R13)
 - [ ] 異常検知アラート (R11)
 
 ### Phase 3: 可視化・改善

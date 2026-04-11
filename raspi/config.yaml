@@ -1,0 +1,51 @@
+# =============================================================================
+# 自動給水システム ローカル設定ファイル
+# =============================================================================
+# この設定がデフォルト値として使われる。
+# Google Spreadsheet の「設定」シートに値が書かれている場合はそちらが優先される。
+# =============================================================================
+
+# --- Arduino 接続 ---
+arduino:
+  port: "/dev/ttyUSB0"       # Arduino Nano のシリアルポート
+  baud_rate: 9600
+  timeout: 2.0               # レスポンス待ちタイムアウト (秒)
+  max_retries: 3
+
+# --- 給水制御 ---
+watering:
+  soil_threshold: 400         # この値以下で「乾燥」と判定 (0=乾燥, 1023=湿潤)
+  pump_duration: 10           # 1回の給水時間 (秒)
+  post_watering_wait: 30      # 給水後、土壌に浸透するまでの待機 (秒)
+  mode: "AUTO"                # AUTO / MANUAL / OFF
+
+# --- スケジュール ---
+schedule:
+  watering_times:             # 給水判定を行う時刻 (複数指定可)
+    - "07:00"
+    - "19:00"
+  sensor_interval_min: 30     # センサー定期取得の間隔 (分)
+  sheets_poll_interval_min: 5 # Spreadsheet ポーリング間隔 (分)
+
+# --- Google Spreadsheet ---
+google_sheets:
+  enabled: false              # true にすると Sheets 連携が有効になる
+  credentials_file: "credentials.json"   # サービスアカウントの鍵ファイル
+  spreadsheet_id: ""          # スプレッドシートID (URLの /d/XXXXX/edit のXXXXX部分)
+  sheet_settings: "設定"      # 設定シート名
+  sheet_sensor_log: "センサーログ"
+  sheet_watering_log: "給水履歴"
+
+# --- 通知 ---
+notification:
+  discord_webhook_url: ""     # 空 = 通知無効
+  notify_on_watering: true
+  notify_on_low_water: true
+  notify_on_error: true
+
+# --- ログ ---
+logging:
+  level: "INFO"               # DEBUG / INFO / WARNING / ERROR
+  file: "logs/watering.log"
+  max_bytes: 5242880          # 5MB
+  backup_count: 3
