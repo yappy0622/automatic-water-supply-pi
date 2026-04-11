@@ -76,6 +76,30 @@ def test_read_water(driver: ArduinoDriver) -> bool:
         return False
 
 
+def test_read_light(driver: ArduinoDriver) -> bool:
+    divider("TEST: READ_LIGHT")
+    try:
+        lux = driver.read_light()
+        print(f"  照度: {lux:.1f} lux")
+        return True
+    except ArduinoError as e:
+        print(f"  エラー: {e}")
+        return False
+
+
+def test_read_ec(driver: ArduinoDriver) -> bool:
+    divider("TEST: READ_EC")
+    try:
+        ec = driver.read_ec()
+        print(f"  EC: {ec:.2f} mS/cm")
+        if ec is not None and ec >= 0:
+            print(f"  土壌電気伝導度: 正常範囲")
+        return True
+    except ArduinoError as e:
+        print(f"  エラー: {e}")
+        return False
+
+
 def test_read_dht(driver: ArduinoDriver) -> bool:
     divider("TEST: READ_DHT")
     try:
@@ -96,6 +120,8 @@ def test_read_all(driver: ArduinoDriver) -> bool:
         print(f"  水位     : {'正常' if data.water_ok else '不足'}")
         print(f"  温度     : {data.temperature} °C")
         print(f"  湿度     : {data.humidity} %")
+        print(f"  照度     : {data.light_lux} lux")
+        print(f"  EC       : {data.ec_value} mS/cm")
         print(f"  ポンプ   : {'稼働中' if data.pump_running else '停止中'}")
         return True
     except ArduinoError as e:
@@ -187,6 +213,8 @@ def run_all_tests(port: str):
             results["VERSION"] = test_version(driver)
             results["READ_SOIL"] = test_read_soil(driver)
             results["READ_WATER"] = test_read_water(driver)
+            results["READ_LIGHT"] = test_read_light(driver)
+            results["READ_EC"] = test_read_ec(driver)
             results["READ_DHT"] = test_read_dht(driver)
             results["READ_ALL"] = test_read_all(driver)
             results["PUMP_CYCLE"] = test_pump_cycle(driver)

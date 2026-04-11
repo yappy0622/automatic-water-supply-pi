@@ -37,7 +37,9 @@ class SensorReadAll:
     water_ok: bool
     temperature: Optional[float]
     humidity: Optional[float]
-    pump_running: bool
+    light_lux: Optional[float]
+    ec_value: Optional[float] = None  # EC (mS/cm) 土壌電気伝導度
+    pump_running: bool = False
 
 
 # =============================================================================
@@ -287,6 +289,38 @@ class ArduinoDriver:
             return (float(values[0]), float(values[1]))
         raise ArduinoError(f"予期しないレスポンス: {response}")
 
+    def read_light(self) -> Optional[float]:
+        """
+        照度センサー値を読み取る
+
+        Returns:
+            照度 (lux)  None: センサー未接続
+        """
+        response = self._send_command("READ_LIGHT")
+        # "LIGHT:350.0"
+        if response.startswith("LIGHT:"):
+            try:
+                return float(response[6:])
+            except ValueError:
+                return None
+        raise ArduinoError(f"予期しないレスポンス: {response}")
+
+    def read_ec(self) -> Optional[float]:
+        """
+        EC (電気伝導度) センサー値を読み取る
+
+        Returns:
+            EC 値 (mS/cm)  None: センサー未接続
+        """
+        response = self._send_command("READ_EC")
+        # "EC:1.25"
+        if response.startswith("EC:"):
+            try:
+                return float(response[3:])
+            except ValueError:
+                return None
+        raise ArduinoError(f"予期しないレスポンス: {response}")
+
     def read_all(self) -> SensorReadAll:
         """
         全センサー一括読み取り
@@ -295,7 +329,7 @@ class ArduinoDriver:
             SensorReadAll データクラス
         """
         response = self._send_command("READ_ALL")
-        # "SOIL:512,480;WATER:1;DHT:25.3,60.2;PUMP:OFF"
+        # "SOIL:512,480;WATER:1;DHT:25.3,60.2;LIGHT:350.0;PUMP:OFF"
         parts = {}
         for segment in response.split(";"):
             key, _, value = segment.partition(":")
@@ -317,6 +351,24 @@ class ArduinoDriver:
             temperature = None
             humidity = None
 
+        # LIGHT
+        light_raw = parts.get("LIGHT", None)
+        light_lux = None
+        if light_raw is not None:
+            try:
+                light_lux = float(light_raw)
+            except ValueError:
+                light_lux = None
+
+        # EC
+        ec_raw = parts.get("EC", None)
+        ec_value = None
+        if ec_raw is not None:
+            try:
+                ec_value = float(ec_raw)
+            except ValueError:
+                ec_value = None
+
         # PUMP
         pump_running = parts.get("PUMP", "OFF") == "ON"
 
@@ -325,6 +377,8 @@ class ArduinoDriver:
             water_ok=water_ok,
             temperature=temperature,
             humidity=humidity,
+            light_lux=light_lux,
+            ec_value=ec_value,
             pump_running=pump_running,
         )
 

@@ -98,7 +98,8 @@ class WateringController:
         logger.info(
             f"センサー値: 土壌={sensor_data.soil} (平均={avg_moisture:.0f}), "
             f"水位={'OK' if sensor_data.water_ok else 'NG'}, "
-            f"温度={sensor_data.temperature}, 湿度={sensor_data.humidity}"
+            f"温度={sensor_data.temperature}, 湿度={sensor_data.humidity}, "
+            f"照度={sensor_data.light_lux}, EC={sensor_data.ec_value}"
         )
 
         # センサーログ記録

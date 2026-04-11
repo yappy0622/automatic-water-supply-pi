@@ -16,7 +16,9 @@
 //   READ_SOIL    → SOIL:512,480
 //   READ_WATER   → WATER:1
 //   READ_DHT     → DHT:25.3,60.2
-//   READ_ALL     → SOIL:512,480;WATER:1;DHT:25.3,60.2;PUMP:OFF
+//   READ_LIGHT   → LIGHT:350.0
+//   READ_EC      → EC:1.25  (mS/cm)
+//   READ_ALL     → SOIL:512,480;WATER:1;DHT:25.3,60.2;LIGHT:350.0;EC:1.25;PUMP:OFF
 //   PUMP_ON      → OK:PUMP_ON  or  ERR:NO_WATER
 //   PUMP_OFF     → OK:PUMP_OFF
 //   STATUS_PUMP  → PUMP:ON  or  PUMP:OFF
@@ -101,6 +103,56 @@ void cmdReadWater() {
 }
 
 /**
+ * 照度センサー (LDR) を読み取り、"LIGHT:lux" 形式で送信
+ */
+float readLightLux() {
+  int raw = readAnalogMedian(PIN_LIGHT);
+  if (raw >= 1023) return 0.0;  // 完全に暗い
+  float resistance = LIGHT_REF_RESISTANCE * (float)raw / (1023.0 - (float)raw);
+  float lux = LIGHT_LUX_MULT / resistance - LIGHT_LUX_OFFSET;
+  if (lux < 0.0) lux = 0.0;
+  return lux;
+}
+
+void cmdReadLight() {
+  float lux = readLightLux();
+  Serial.print("LIGHT:");
+  Serial.println(lux, 1);
+}
+
+/**
+ * EC/TDS センサーを読み取り、"EC:value" 形式で送信 (mS/cm)
+ * 温度補償付き: DHT22 の温度値を使用
+ */
+float readEC() {
+  int raw = readAnalogMedian(PIN_EC);
+  float voltage = (float)raw * EC_VREF / 1024.0;
+
+  // 温度補償 (DHT22の温度値を使用)
+  float temp = dht.readTemperature();
+  if (isnan(temp)) temp = 25.0;  // フォールバック
+
+  float compensationCoeff = 1.0 + EC_TEMP_COEFF * (temp - 25.0);
+  float compensatedVoltage = voltage / compensationCoeff;
+
+  // TDS (ppm) → EC (mS/cm) 変換
+  // TDS Meter v1.0 の近似式: TDS = (133.42*V^3 - 255.86*V^2 + 857.39*V) * kValue
+  float tds = (133.42 * compensatedVoltage * compensatedVoltage * compensatedVoltage
+             - 255.86 * compensatedVoltage * compensatedVoltage
+             + 857.39 * compensatedVoltage) * EC_KVALUE;
+  if (tds < 0.0) tds = 0.0;
+
+  float ec = tds * 2.0 / 1000.0;  // TDS (ppm) → EC (mS/cm)
+  return ec;
+}
+
+void cmdReadEC() {
+  float ec = readEC();
+  Serial.print("EC:");
+  Serial.println(ec, 2);
+}
+
+/**
  * DHT22 から温度・湿度を読み取り、"DHT:temp,hum" 形式で送信
  */
 void cmdReadDHT() {
@@ -145,6 +197,16 @@ void cmdReadAll() {
     Serial.print(",");
     Serial.print(hum, 1);
   }
+
+  // LIGHT
+  float lux = readLightLux();
+  Serial.print(";LIGHT:");
+  Serial.print(lux, 1);
+
+  // EC
+  float ec = readEC();
+  Serial.print(";EC:");
+  Serial.print(ec, 2);
 
   // PUMP
   Serial.print(";PUMP:");
@@ -268,6 +330,12 @@ void processCommand(const char* cmd) {
   }
   else if (strcmp(cmd, "READ_WATER") == 0) {
     cmdReadWater();
+  }
+  else if (strcmp(cmd, "READ_LIGHT") == 0) {
+    cmdReadLight();
+  }
+  else if (strcmp(cmd, "READ_EC") == 0) {
+    cmdReadEC();
   }
   else if (strcmp(cmd, "READ_DHT") == 0) {
     cmdReadDHT();

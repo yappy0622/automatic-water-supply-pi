@@ -25,7 +25,9 @@ schedule:
     - "07:00"
     - "19:00"
   sensor_interval_min: 30     # センサー定期取得の間隔 (分)
-  sheets_poll_interval_min: 5 # Spreadsheet ポーリング間隔 (分)
+  sheets_poll_interval_min: 30 # Spreadsheet ポーリング間隔 (分)　※センサー記録と同周期で省電力
+  main_loop_sleep_sec: 30     # メインループのスリープ間隔 (秒)　※省電力設計
+  graph_interval_hours: 6     # グラフ生成間隔 (時間)
 
 # --- Google Spreadsheet ---
 google_sheets:
