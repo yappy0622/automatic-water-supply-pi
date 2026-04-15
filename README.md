@@ -39,6 +39,131 @@ Raspberry Pi + Arduino による自動給水システム
 └──────────────────────────────────────────────────┘
 ```
 
+```mermaid
+---
+title: モロヘイヤ自動水やりシステム 全体構成図
+---
+
+graph TB
+    subgraph RaspberryPi["🖥️ Raspberry Pi"]
+        RPi_USB["USB-A ポート"]
+        RPi_App["制御アプリ\n（Python）"]
+        RPi_Discord["Discord Webhook\n通知モジュール"]
+        RPi_App --> RPi_Discord
+        RPi_App --> RPi_USB
+    end
+
+    subgraph FPC["📎 FPC フラットケーブル 1m"]
+        FPC_Cable["USB-A ⇔ USB-C\n電源 + シリアル通信"]
+    end
+
+    subgraph Arduino["⚡ Arduino Nano（CH340C / Type-C）"]
+        Nano_Serial["シリアル通信\nUSB経由"]
+        Nano_D7["D7 → リレー制御"]
+        Nano_D2["D2 ← フロートSW\n（INPUT_PULLUP）"]
+        Nano_A0["A0 ← 土壌水分センサー"]
+        Nano_A1["A1 ← 電池電圧監視"]
+        Nano_5V["5V 出力"]
+        Nano_GND["GND"]
+    end
+
+    subgraph Relay["🔌 5V 1ch リレーモジュール"]
+        Relay_VCC["VCC"]
+        Relay_GND["GND"]
+        Relay_IN["IN（制御信号）"]
+        Relay_COM["COM"]
+        Relay_NO["NO（常開）"]
+    end
+
+    subgraph Pump["⛽ 灯油ポンプ（工進 EP-306 改造）"]
+        Pump_Motor["DCモーター"]
+        Pump_Nozzle["ノズル\n（先端カット済）"]
+        Battery["単三電池 ×2\n（3V）"]
+        Wire_Black["黒線（GND）"]
+        Wire_Gray["灰色線（電源）"]
+        Wire_Blue["藍色線（信号）\n※絶縁して未使用"]
+    end
+
+    subgraph Tank["🪣 灯油用ポリタンク 10L"]
+        Tank_Body["不透明タンク\n＋アルミ保温シート"]
+        Float_SW["フロートスイッチ\n（タンク空検知）"]
+        Water["水（＋液肥）"]
+    end
+
+    subgraph Planter["🌱 8号植木鉢（モロヘイヤ）"]
+        Soil_Sensor["容量性\n土壌水分センサー"]
+        Drip_Ring["ドリップリング\nシリコンホース ≈60cm\n（ピン穴 等間隔）"]
+        T_Joint["T字ジョイント\n（タカギ 14mm）"]
+    end
+
+    subgraph Enclosure["📦 防水ケース（密閉タッパー）"]
+        UniBoard["ユニバーサル基板\n4×6cm"]
+    end
+
+    subgraph Notification["📱 スマホ通知"]
+        Discord_App["Discord アプリ"]
+    end
+
+    %% 接続: RPi → FPC → Nano
+    RPi_USB -->|"USB-A"| FPC_Cable
+    FPC_Cable -->|"USB-C"| Nano_Serial
+
+    %% Nano → リレー
+    Nano_D7 -->|"HIGH/LOW"| Relay_IN
+    Nano_5V -->|"5V"| Relay_VCC
+    Nano_GND -->|"GND"| Relay_GND
+
+    %% リレー → ポンプ電池ライン
+    Battery -->|"電池 +"| Relay_COM
+    Relay_NO -->|"灰色線 直結"| Pump_Motor
+    Wire_Black -->|"電池 −"| Pump_Motor
+
+    %% ポンプ → 配管
+    Pump_Nozzle -->|"シリコンチューブ\n内径15mm"| T_Joint
+    T_Joint -->|"左右へ分岐"| Drip_Ring
+
+    %% タンク → ポンプ
+    Water -->|"吸水"| Pump_Motor
+
+    %% フロートスイッチ
+    Float_SW -->|"D2\nタンク空=LOW"| Nano_D2
+    Float_SW ---|"GND"| Nano_GND
+
+    %% 土壌水分センサー
+    Soil_Sensor -->|"AOUT → A0"| Nano_A0
+    Soil_Sensor ---|"VCC"| Nano_5V
+    Soil_Sensor ---|"GND"| Nano_GND
+
+    %% 電池電圧監視
+    Battery -.->|"分圧抵抗経由"| Nano_A1
+
+    %% Discord 通知
+    RPi_Discord -->|"HTTPS\nWebhook"| Discord_App
+
+    %% Nano・リレーは防水ケース内
+    Arduino -.->|"収納"| Enclosure
+    Relay -.->|"収納"| Enclosure
+
+    %% スタイル
+    classDef pi fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef nano fill:#bbdefb,stroke:#1565c0,stroke-width:2px
+    classDef relay fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+    classDef pump fill:#ffccbc,stroke:#d84315,stroke-width:2px
+    classDef tank fill:#b3e5fc,stroke:#0277bd,stroke-width:2px
+    classDef plant fill:#dcedc8,stroke:#558b2f,stroke-width:2px
+    classDef notify fill:#e1bee7,stroke:#7b1fa2,stroke-width:2px
+    classDef box fill:#f5f5f5,stroke:#616161,stroke-width:1px,stroke-dasharray: 5 5
+
+    class RaspberryPi pi
+    class Arduino nano
+    class Relay relay
+    class Pump pump
+    class Tank tank
+    class Planter plant
+    class Notification notify
+    class Enclosure box
+```
+
 ## 使用ハードウェア
 
 | 部品 | 型番・仕様 |
