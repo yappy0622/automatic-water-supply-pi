@@ -222,6 +222,16 @@ nohup python main.py > /dev/null 2>&1 &
 
 ## Arduino ファームウェア
 
+### raspiからの操作方法
+
+sshログイン後、下記コマンドでminicomを起動
+```
+minicom -b 9600 -D /dev/ttyUSB0
+```
+Ctrl + A, EでローカルエコーをON
+
+下記のコマンド一覧を入力後、Ctrl + Enterでコマンド送信
+
 ### コマンド一覧
 
 | コマンド | レスポンス | 説明 |
