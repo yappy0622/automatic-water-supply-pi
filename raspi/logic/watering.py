@@ -94,7 +94,6 @@ class WateringController:
         """
         result = WateringResult()
         result.trigger = trigger
-        wc = self._config.watering
 
         logger.info(f"=== 給水判定開始 (trigger={trigger}, mode={wc.mode}) ===")
 
@@ -124,10 +123,14 @@ class WateringController:
         # 各センサー値を正規化 (0.0=乾燥, 1.0=湿潤)
         wc = self._config.watering
         calibrated = []
-        params = [
-            (wc.sensor1_dry, wc.sensor1_wet),
-            (wc.sensor2_dry, wc.sensor2_wet),
-        ]
+        # センサー設定をリスト化する場合
+        params = [(s.dry, s.wet) for s in wc.sensors]
+
+        # zip の挙動上、soil と params の数が違っても黙ってトランケートされるため
+        # 本数が一致しているかチェックを追加すると安全
+        if len(sensor_data.soil) != len(params):
+            logger.warning(f"センサー数不一致: soil={len(sensor_data.soil)}, params={len(params)}")
+
         for raw, (dry, wet) in zip(sensor_data.soil, params):
             calibrated.append(normalize_sensor_value(raw, dry, wet))
         
@@ -222,7 +225,7 @@ class WateringController:
 
             # 湿度が上がっていれば成功
             delta = avg_after - avg_moisture
-            result.success = delta > 0.02  # 0.02以上の上昇があれば成功とみなす (要調整)
+            result.success = delta > wc.success_moisture_delta  # 0.02以上の上昇があれば成功とみなす (要調整)
             if result.success:
                 result.message = f"給水成功: {avg_moisture:.2f} → {avg_after:.2f}"
             else:
@@ -247,14 +250,13 @@ class WateringController:
     # =========================================================================
 
     def _execute_pump(self, duration: int) -> None:
-        """ポンプを指定秒数ONにして停止する"""
         logger.info(f"ポンプ ON ({duration}秒間)")
         self._arduino.pump_on()
-
-        time.sleep(duration)
-
-        logger.info("ポンプ OFF")
-        self._arduino.pump_off()
+        try:
+            time.sleep(duration)
+        finally:
+            logger.info("ポンプ OFF")
+            self._arduino.pump_off()  # 必ず止める
 
     def emergency_stop(self) -> None:
         """緊急停止"""

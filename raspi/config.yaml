@@ -18,17 +18,18 @@ watering:
   # 例: 0.4 = 40%以下で給水、0.5 = 50%以下で給水
   soil_threshold: 0.4        # この値以下で「乾燥」と判定 (0.0=乾燥, 1.0=湿潤)
   soil_critical_threshold: 0.15 # これ以下は「非常に乾燥」と判定して緊急通知
-  pump_duration: 10           # 1回の給水時間 (秒)
-  post_watering_wait: 30      # 給水後、土壌に浸透するまでの待機 (秒)
+  success_moisture_delta: 0.02 # 給水成功とみなす湿度の上昇量 (例: 0.02 = 2%ポイント以上の上昇)
+  pump_duration: 50           # 1回の給水時間 (秒)
+  post_watering_wait: 60      # 給水後、土壌に浸透するまでの待機 (秒)
   mode: "AUTO"                # AUTO / MANUAL / OFF
 
   # --- センサーキャリブレーション ---
   # 乾燥時と湿潤時の実測値を記録することで、異なる特性のセンサーを正規化
   # 乾燥・湿潤の大小関係が逆でも正しく動作する
   sensor1_dry: 442            # センサ1 乾燥時の生値
-  sensor1_wet: 297            # センサ1 湿潤時の生値
+  sensor1_wet: 212            # センサ1 湿潤時の生値
   sensor2_dry: 5              # センサ2 乾燥時の生値
-  sensor2_wet: 47             # センサ2 湿潤時の生値
+  sensor2_wet: 144             # センサ2 湿潤時の生値
 
 # --- スケジュール ---
 schedule:
