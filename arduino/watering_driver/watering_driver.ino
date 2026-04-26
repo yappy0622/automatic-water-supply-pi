@@ -160,16 +160,17 @@ void cmdReadAll() {
  * 安全チェック: 水位不足ならエラーを返して起動しない
  */
 void cmdPumpOn() {
-  // 安全チェック: 水位確認
-  if (digitalRead(PIN_WATER_LEVEL) == LOW) {
-    Serial.println("ERR:NO_WATER");
-    return;
-  }
 
   digitalWrite(PIN_PUMP_RELAY, RELAY_ON);
   pumpRunning = true;
   pumpStartTime = millis();
-  Serial.println("OK:PUMP_ON");
+
+  // 安全チェック: 水位確認
+  if (digitalRead(PIN_WATER_LEVEL) == LOW) {
+    Serial.println("WARN:PUMP_ON_NO_WATER");
+  }else{
+    Serial.println("OK:PUMP_ON");
+  }
 }
 
 /**
