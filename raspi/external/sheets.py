@@ -200,12 +200,12 @@ class SheetsClient:
             row = [
                 now,
                 trigger,
-                f"{avg_before:.0f}",
+                f"{avg_before:.2f}",
                 str(pump_duration),
-                f"{avg_after:.0f}",
+                f"{avg_after:.2f}",
                 result,
             ]
             ws.append_row(row, value_input_option="USER_ENTERED")
-            logger.info(f"給水履歴追記: {trigger} / {avg_before:.0f}→{avg_after:.0f} / {result}")
+            logger.info(f"給水履歴追記: {trigger} / {avg_before:.2f}→{avg_after:.2f} / {result}")
         except Exception as e:
             logger.error(f"給水履歴書き込みエラー: {e}")

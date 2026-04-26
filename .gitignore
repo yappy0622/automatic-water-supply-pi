@@ -31,3 +31,4 @@ token.json
 
 # Arduino build artifacts
 arduino/watering_driver/build/
+raspi/config.yaml

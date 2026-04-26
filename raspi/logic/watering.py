@@ -52,13 +52,15 @@ class WateringResult:
 
     def __init__(self):
         self.executed: bool = False
-        self.trigger: str = ""           # "AUTO" / "MANUAL"
+        self.trigger: str = ""
         self.soil_before: list[int] = []
         self.soil_after: list[int] = []
+        self.soil_before_normalized: list[float] = []
+        self.soil_after_normalized: list[float] = []
         self.pump_duration: int = 0
         self.success: bool = False
         self.message: str = ""
-        self.skipped_reason: str = ""    # 給水しなかった理由
+        self.skipped_reason: str = ""
 
 
 class WateringController:
@@ -94,6 +96,7 @@ class WateringController:
         """
         result = WateringResult()
         result.trigger = trigger
+        wc = self._config.watering
 
         logger.info(f"=== 給水判定開始 (trigger={trigger}, mode={wc.mode}) ===")
 
@@ -118,18 +121,16 @@ class WateringController:
             return result
 
         result.soil_before = sensor_data.soil
+        result.soil_before_normalized = calibrated
         
         # --- センサーキャリブレーション ---
         # 各センサー値を正規化 (0.0=乾燥, 1.0=湿潤)
-        wc = self._config.watering
         calibrated = []
         # センサー設定をリスト化する場合
-        params = [(s.dry, s.wet) for s in wc.sensors]
-
-        # zip の挙動上、soil と params の数が違っても黙ってトランケートされるため
-        # 本数が一致しているかチェックを追加すると安全
-        if len(sensor_data.soil) != len(params):
-            logger.warning(f"センサー数不一致: soil={len(sensor_data.soil)}, params={len(params)}")
+        params = [
+            (wc.sensor1_dry, wc.sensor1_wet),
+            (wc.sensor2_dry, wc.sensor2_wet),
+        ]
 
         for raw, (dry, wet) in zip(sensor_data.soil, params):
             calibrated.append(normalize_sensor_value(raw, dry, wet))
@@ -145,7 +146,7 @@ class WateringController:
         )
 
         # センサーログ記録
-        self._log_sensor_to_sheets(sensor_data)
+        self._log_sensor_to_sheets(sensor_data, calibrated=calibrated)
 
         # --- 手動給水: 閾値判定をスキップして即給水 ---
         if trigger == "MANUAL":
@@ -179,7 +180,7 @@ class WateringController:
         if not sensor_data.water_ok:
             result.skipped_reason = "給水タンクの水が不足しています"
             logger.warning(f"給水中止: {result.skipped_reason}")
-            self._log_sensor_to_sheets(sensor_data, note="ALERT: 水不足")
+            self._log_sensor_to_sheets(sensor_data, note="ALERT: 水不足", calibrated=calibrated)
             return result
 
         # --- 給水実行 ---
@@ -213,6 +214,7 @@ class WateringController:
         try:
             soil_after_raw = self._arduino.read_soil()
             result.soil_after = soil_after_raw
+            result.soil_after_normalized = calibrated_after
             
             # 給水後の値も正規化
             calibrated_after = [
@@ -275,6 +277,7 @@ class WateringController:
         data: Optional[SensorReadAll],
         pump_status: str = "--",
         note: str = "",
+        calibrated: Optional[list[float]] = None,
     ) -> None:
         """センサーデータを Spreadsheet に記録 (有効な場合のみ)"""
         if self._sheets is None:
@@ -302,15 +305,14 @@ class WateringController:
             logger.error(f"Sheets センサーログ記録失敗: {e}")
 
     def _log_watering_to_sheets(self, result: WateringResult) -> None:
-        """給水結果を Spreadsheet に記録 (有効な場合のみ)"""
         if self._sheets is None:
             return
         try:
             self._sheets.append_watering_log(
                 trigger=result.trigger,
-                soil_before=result.soil_before,
+                soil_before=result.soil_before_normalized,  # 正規化済みに変更
                 pump_duration=result.pump_duration,
-                soil_after=result.soil_after,
+                soil_after=result.soil_after_normalized,    # 正規化済みに変更
                 result="SUCCESS" if result.success else "FAIL",
             )
         except Exception as e:

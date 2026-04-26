@@ -31,10 +31,12 @@ class ArduinoConfig:
 
 @dataclass
 class WateringConfig:
-    soil_threshold: float = 0.4  # 0.0〜1.0 の正規化済み値
+    soil_threshold: float = 0.4 # この値以下で「乾燥」と判定 (0.0=乾燥, 1.0=湿潤)
+    soil_critical_threshold: float = 0.15  # 追加
+    success_moisture_delta: float = 0.02   # 追加
     pump_duration: int = 10
     post_watering_wait: int = 30
-    mode: str = "AUTO"  # AUTO / MANUAL / OFF
+    mode: str = "AUTO"
     # センサーキャリブレーション
     sensor1_dry: int = 0
     sensor1_wet: int = 1023
