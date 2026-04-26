@@ -12,7 +12,7 @@
 //
 // コマンド一覧:
 //   PING         → PONG
-//   VERSION      → VERSION:WateringDriver,1.0.0
+//   VERSION      → VERSION:WateringDriver,1.0.1
 //   READ_SOIL    → SOIL:512,480
 //   READ_WATER   → WATER:1
 //   READ_DHT     → DHT:25.3,60.2
@@ -235,9 +235,7 @@ void checkWaterDuringPump() {
   if (!pumpRunning) return;
 
   if (digitalRead(PIN_WATER_LEVEL) == LOW) {
-    digitalWrite(PIN_PUMP_RELAY, RELAY_OFF);
-    pumpRunning = false;
-    pumpStartTime = 0;
+    // ポンプは止めない
     Serial.println("WARN:WATER_EMPTY_DURING_PUMP");
   }
 }
