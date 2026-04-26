@@ -124,16 +124,19 @@ class WateringController:
         # 各センサー値を正規化 (0.0=乾燥, 1.0=湿潤)
         wc = self._config.watering
         calibrated = []
-        for i, raw in enumerate(sensor_data.soil):
-            if i == 0:
-                calibrated.append(normalize_sensor_value(raw, wc.sensor1_dry, wc.sensor1_wet))
-            else:
-                calibrated.append(normalize_sensor_value(raw, wc.sensor2_dry, wc.sensor2_wet))
+        params = [
+            (wc.sensor1_dry, wc.sensor1_wet),
+            (wc.sensor2_dry, wc.sensor2_wet),
+        ]
+        for raw, (dry, wet) in zip(sensor_data.soil, params):
+            calibrated.append(normalize_sensor_value(raw, dry, wet))
         
         avg_moisture = sum(calibrated) / len(calibrated) if calibrated else 0
+        min_moisture = min(calibrated) if calibrated else 0
 
         logger.info(
-            f"センサー値: 生値={sensor_data.soil} → 正規化={calibrated} (平均={avg_moisture:.2f}), "
+            f"センサー値: 生値={sensor_data.soil} → 正規化={calibrated} "
+            f"(avg={avg_moisture:.2f}, min={min_moisture:.2f}), "
             f"水位={'OK' if sensor_data.water_ok else 'NG'}, "
             f"温度={sensor_data.temperature}, 湿度={sensor_data.humidity}"
         )
@@ -146,18 +149,28 @@ class WateringController:
             logger.info("手動給水: 閾値判定をスキップ")
         else:
             # --- 土壌湿度判定 ---
-            # 閾値を生値(0-1023)から正規化(0.0-1.0)に変換して比較
-            normalized_threshold = wc.soil_threshold / 1023.0
-            if avg_moisture >= normalized_threshold:
+            # soil_threshold は 0.0〜1.0 の正規化済み値
+            threshold = wc.soil_threshold          # 例: 0.35（乾燥寄り）
+            critical = wc.soil_critical_threshold # 例: 0.15（安全ライン）
+
+            # 危険な乾燥 → 即給水
+            if min_moisture < critical:
+                logger.warning(
+                    f"危険乾燥検知: min={min_moisture:.2f} < {critical:.2f} → 強制給水"
+                )
+
+            # 通常判定（トマト向け：平均で乾燥維持）
+            elif avg_moisture >= threshold:
                 result.skipped_reason = (
-                    f"土壌湿度十分 (正規化平均={avg_moisture:.2f} >= 閾値={normalized_threshold:.2f})"
+                    f"土壌湿度十分 (avg={avg_moisture:.2f} >= {threshold:.2f})"
                 )
                 logger.info(f"給水不要: {result.skipped_reason}")
                 return result
 
-            logger.info(
-                f"乾燥検知: 正規化平均={avg_moisture:.2f} < 閾値={normalized_threshold:.2f} → 給水実行"
-            )
+            else:
+                logger.info(
+                    f"乾燥検知: avg={avg_moisture:.2f} < {threshold:.2f} → 給水"
+                )
 
         # --- 水位チェック ---
         if not sensor_data.water_ok:
@@ -199,22 +212,21 @@ class WateringController:
             result.soil_after = soil_after_raw
             
             # 給水後の値も正規化
-            calibrated_after = []
-            for i, raw in enumerate(soil_after_raw):
-                if i == 0:
-                    calibrated_after.append(normalize_sensor_value(raw, wc.sensor1_dry, wc.sensor1_wet))
-                else:
-                    calibrated_after.append(normalize_sensor_value(raw, wc.sensor2_dry, wc.sensor2_wet))
+            calibrated_after = [
+                normalize_sensor_value(raw, dry, wet)
+                for raw, (dry, wet) in zip(soil_after_raw, params)
+            ]
             
             avg_after = sum(calibrated_after) / len(calibrated_after) if calibrated_after else 0
             logger.info(f"給水後の土壌湿度: 生値={soil_after_raw} → 正規化={calibrated_after} (平均={avg_after:.2f})")
 
             # 湿度が上がっていれば成功
-            result.success = avg_after > avg_moisture
+            delta = avg_after - avg_moisture
+            result.success = delta > 0.02  # 0.02以上の上昇があれば成功とみなす (要調整)
             if result.success:
-                result.message = f"給水成功: {avg_moisture:.0f} → {avg_after:.0f}"
+                result.message = f"給水成功: {avg_moisture:.2f} → {avg_after:.2f}"
             else:
-                result.message = f"給水したが湿度上昇なし: {avg_moisture:.0f} → {avg_after:.0f}"
+                result.message = f"給水したが湿度上昇なし: {avg_moisture:.2f} → {avg_after:.2f}"
                 logger.warning(result.message)
 
         except ArduinoError as e:

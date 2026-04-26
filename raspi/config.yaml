@@ -17,6 +17,7 @@ watering:
   # 閾値は0.0〜1.0の範囲で指定 (内部で生値400→0.39として解釈)
   # 例: 0.4 = 40%以下で給水、0.5 = 50%以下で給水
   soil_threshold: 0.4        # この値以下で「乾燥」と判定 (0.0=乾燥, 1.0=湿潤)
+  soil_critical_threshold: 0.15 # これ以下は「非常に乾燥」と判定して緊急通知
   pump_duration: 10           # 1回の給水時間 (秒)
   post_watering_wait: 30      # 給水後、土壌に浸透するまでの待機 (秒)
   mode: "AUTO"                # AUTO / MANUAL / OFF

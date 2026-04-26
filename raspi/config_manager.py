@@ -31,7 +31,7 @@ class ArduinoConfig:
 
 @dataclass
 class WateringConfig:
-    soil_threshold: int = 400
+    soil_threshold: float = 0.4  # 0.0〜1.0 の正規化済み値
     pump_duration: int = 10
     post_watering_wait: int = 30
     mode: str = "AUTO"  # AUTO / MANUAL / OFF
@@ -159,7 +159,7 @@ class ConfigManager:
 
         if "soil_threshold" in sheets_data:
             try:
-                w.soil_threshold = int(sheets_data["soil_threshold"])
+                w.soil_threshold = float(sheets_data["soil_threshold"])
                 logger.info(f"[Sheets] 土壌湿度閾値 → {w.soil_threshold}")
             except (ValueError, TypeError):
                 pass
