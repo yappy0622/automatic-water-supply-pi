@@ -35,6 +35,11 @@ class WateringConfig:
     pump_duration: int = 10
     post_watering_wait: int = 30
     mode: str = "AUTO"  # AUTO / MANUAL / OFF
+    # センサーキャリブレーション
+    sensor1_dry: int = 0
+    sensor1_wet: int = 1023
+    sensor2_dry: int = 0
+    sensor2_wet: int = 1023
 
 
 @dataclass
@@ -184,6 +189,15 @@ class ConfigManager:
             self._config.notification.notify_on_watering = enabled
             self._config.notification.notify_on_low_water = enabled
             logger.info(f"[Sheets] 通知 → {'ON' if enabled else 'OFF'}")
+
+        # センサーキャリブレーション
+        for key in ("sensor1_dry", "sensor1_wet", "sensor2_dry", "sensor2_wet"):
+            if key in sheets_data:
+                try:
+                    setattr(w, key, int(sheets_data[key]))
+                    logger.info(f"[Sheets] {key} → {getattr(w, key)}")
+                except (ValueError, TypeError):
+                    pass
 
     def is_manual_trigger(self, sheets_data: dict) -> bool:
         """

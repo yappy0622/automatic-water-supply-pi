@@ -37,12 +37,17 @@ except ImportError:
 # Spreadsheet「設定」シートのセルマッピング
 # A列=項目名, B列=値
 SETTINGS_CELL_MAP = {
-    "B2": "soil_threshold",      # 土壌湿度閾値
+    "B2": "soil_threshold",      # 土壌湿度閾値 (0.0〜1.0)
     "B3": "pump_duration",       # 給水時間(秒)
     "B4": "watering_time",       # スケジュール時刻
     "B5": "mode",                # 給水モード (AUTO/MANUAL/OFF)
     "B6": "manual_trigger",      # 手動給水指示 (TRUE/FALSE)
     "B7": "notification_enabled", # 通知ON/OFF
+    # センサーキャリブレーション (B8-B11)
+    "B8": "sensor1_dry",         # センサ1 乾燥時の生値
+    "B9": "sensor1_wet",         # センサ1 湿潤時の生値
+    "B10": "sensor2_dry",        # センサ2 乾燥時の生値
+    "B11": "sensor2_wet",        # センサ2 湿潤時の生値
 }
 
 SCOPES = [

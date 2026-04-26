@@ -21,6 +21,32 @@ from raspi.external.sheets import SheetsClient
 logger = logging.getLogger(__name__)
 
 
+def normalize_sensor_value(raw_value: int, dry: int, wet: int) -> float:
+    """
+    センサー値を0-1の範囲に正規化する。
+
+    乾燥・湿潤の大小関係が逆でも正しく動作する:
+    - 乾燥値 > 湿潤値 の場合 (一般的なセンサー): dry=442, wet=297 → 乾燥=1.0, 湿潤=0.0
+    - 乾燥値 < 湿潤値 の場合: dry=5, wet=47 → 乾燥=0.0, 湿潤=1.0
+
+    Args:
+        raw_value: センサーの生値
+        dry: 乾燥時の実測値
+        wet: 湿潤時の実測値
+
+    Returns:
+        正規化された湿度 (0.0=乾燥, 1.0=湿潤)
+    """
+    if dry == wet:
+        return 0.5  # ゼロ除算防止
+
+    # 線形補間で0-1に正規化
+    normalized = (raw_value - dry) / (wet - dry)
+
+    # 0-1の範囲にクランプ
+    return max(0.0, min(1.0, normalized))
+
+
 class WateringResult:
     """給水実行の結果"""
 
@@ -93,10 +119,21 @@ class WateringController:
             return result
 
         result.soil_before = sensor_data.soil
-        avg_moisture = sum(sensor_data.soil) / len(sensor_data.soil) if sensor_data.soil else 0
+        
+        # --- センサーキャリブレーション ---
+        # 各センサー値を正規化 (0.0=乾燥, 1.0=湿潤)
+        wc = self._config.watering
+        calibrated = []
+        for i, raw in enumerate(sensor_data.soil):
+            if i == 0:
+                calibrated.append(normalize_sensor_value(raw, wc.sensor1_dry, wc.sensor1_wet))
+            else:
+                calibrated.append(normalize_sensor_value(raw, wc.sensor2_dry, wc.sensor2_wet))
+        
+        avg_moisture = sum(calibrated) / len(calibrated) if calibrated else 0
 
         logger.info(
-            f"センサー値: 土壌={sensor_data.soil} (平均={avg_moisture:.0f}), "
+            f"センサー値: 生値={sensor_data.soil} → 正規化={calibrated} (平均={avg_moisture:.2f}), "
             f"水位={'OK' if sensor_data.water_ok else 'NG'}, "
             f"温度={sensor_data.temperature}, 湿度={sensor_data.humidity}"
         )
@@ -109,15 +146,17 @@ class WateringController:
             logger.info("手動給水: 閾値判定をスキップ")
         else:
             # --- 土壌湿度判定 ---
-            if avg_moisture >= wc.soil_threshold:
+            # 閾値を生値(0-1023)から正規化(0.0-1.0)に変換して比較
+            normalized_threshold = wc.soil_threshold / 1023.0
+            if avg_moisture >= normalized_threshold:
                 result.skipped_reason = (
-                    f"土壌湿度十分 (平均={avg_moisture:.0f} >= 閾値={wc.soil_threshold})"
+                    f"土壌湿度十分 (正規化平均={avg_moisture:.2f} >= 閾値={normalized_threshold:.2f})"
                 )
                 logger.info(f"給水不要: {result.skipped_reason}")
                 return result
 
             logger.info(
-                f"乾燥検知: 平均={avg_moisture:.0f} < 閾値={wc.soil_threshold} → 給水実行"
+                f"乾燥検知: 正規化平均={avg_moisture:.2f} < 閾値={normalized_threshold:.2f} → 給水実行"
             )
 
         # --- 水位チェック ---
@@ -156,10 +195,19 @@ class WateringController:
         time.sleep(wc.post_watering_wait)
 
         try:
-            soil_after = self._arduino.read_soil()
-            result.soil_after = soil_after
-            avg_after = sum(soil_after) / len(soil_after) if soil_after else 0
-            logger.info(f"給水後の土壌湿度: {soil_after} (平均={avg_after:.0f})")
+            soil_after_raw = self._arduino.read_soil()
+            result.soil_after = soil_after_raw
+            
+            # 給水後の値も正規化
+            calibrated_after = []
+            for i, raw in enumerate(soil_after_raw):
+                if i == 0:
+                    calibrated_after.append(normalize_sensor_value(raw, wc.sensor1_dry, wc.sensor1_wet))
+                else:
+                    calibrated_after.append(normalize_sensor_value(raw, wc.sensor2_dry, wc.sensor2_wet))
+            
+            avg_after = sum(calibrated_after) / len(calibrated_after) if calibrated_after else 0
+            logger.info(f"給水後の土壌湿度: 生値={soil_after_raw} → 正規化={calibrated_after} (平均={avg_after:.2f})")
 
             # 湿度が上がっていれば成功
             result.success = avg_after > avg_moisture
