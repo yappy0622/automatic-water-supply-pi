@@ -2,6 +2,11 @@
 test_scheduled_logging.py - スケジュール給水判定時の Sheets ログテスト
 """
 
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
 from raspi.arduino.serial_driver import SensorReadAll
 from raspi.config_manager import AppConfig
 from raspi.logic.watering import WateringController

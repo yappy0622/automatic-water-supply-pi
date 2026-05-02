@@ -13,9 +13,9 @@ import sys
 import os
 
 # プロジェクトルートをパスに追加
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from logic.watering import normalize_sensor_value
+from raspi.logic.watering import normalize_sensor_value
 
 
 def test_dry_greater_than_wet():

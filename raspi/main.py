@@ -24,7 +24,7 @@ import time
 import signal
 import argparse
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 # プロジェクトルートをパスに追加
@@ -54,6 +54,7 @@ class WateringSystem:
         self._last_sensor_read = 0.0
         self._last_sheets_poll = 0.0
         self._last_watering_checks: set[str] = set()  # 今日チェック済みの時刻
+        self._last_watering_check_date: date = datetime.now().date()
 
     # =========================================================================
     # 起動・終了
@@ -159,6 +160,11 @@ class WateringSystem:
                 now = datetime.now()
                 current_time = time.time()
 
+                # --- 日付変更で判定済みリストをリセット ---
+                if now.date() != self._last_watering_check_date:
+                    self._last_watering_checks.clear()
+                    self._last_watering_check_date = now.date()
+
                 # --- 1. Spreadsheet ポーリング ---
                 sheets_interval = self._cfg.schedule.sheets_poll_interval_min * 60
                 if (
@@ -177,10 +183,6 @@ class WateringSystem:
                 if current_time - self._last_sensor_read >= sensor_interval:
                     self._periodic_sensor_read()
                     self._last_sensor_read = current_time
-
-                # --- 日付変更で判定済みリストをリセット ---
-                if now.hour == 0 and now.minute == 0:
-                    self._last_watering_checks.clear()
 
                 # スリープ (CPU 負荷軽減)
                 time.sleep(10)

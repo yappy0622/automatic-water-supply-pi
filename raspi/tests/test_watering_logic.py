@@ -13,9 +13,9 @@ import sys
 import os
 
 # プロジェクトルートをパスに追加
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from logic.watering import normalize_sensor_value
+from raspi.logic.watering import normalize_sensor_value
 
 
 def test_threshold_comparison():
@@ -31,7 +31,7 @@ def test_threshold_comparison():
         # (sensor1_raw, sensor2_raw, 期待: True=給水不要, False=給水実行)
         ([442, 47], True),   # 両方湿潤 → 給水不要
         ([370, 30], True),   # 中間程度 → 給水不要
-        ([442, 5], True),    # センサー1乾燥、センサー2乾燥 → 給水実行!
+        ([442, 5], False),   # センサー1乾燥、センサー2乾燥 → 給水実行
         ([297, 47], True),   # 両方湿潤 → 給水不要
         ([442, 20], False),  # センサー1乾燥、センサー2中間 → 給水実行
     ]
