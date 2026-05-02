@@ -104,11 +104,13 @@ class WateringController:
         if wc.mode == "OFF":
             result.skipped_reason = "給水モード OFF"
             logger.info(f"スキップ: {result.skipped_reason}")
+            self._log_watering_to_sheets(result)
             return result
 
         if wc.mode == "MANUAL" and trigger == "AUTO":
             result.skipped_reason = "MANUAL モードのためスケジュール給水はスキップ"
             logger.info(f"スキップ: {result.skipped_reason}")
+            self._log_watering_to_sheets(result)
             return result
 
         # --- センサー読み取り ---
@@ -118,6 +120,7 @@ class WateringController:
             result.skipped_reason = f"センサー読み取り失敗: {e}"
             logger.error(result.skipped_reason)
             self._log_sensor_to_sheets(None, note=f"ERR: {e}")
+            self._log_watering_to_sheets(result)
             return result
         
         # --- センサーキャリブレーション ---
@@ -177,6 +180,7 @@ class WateringController:
                     f"土壌湿度十分 (avg={avg_moisture:.2f} >= {threshold:.2f})"
                 )
                 logger.info(f"給水不要: {result.skipped_reason}")
+                self._log_watering_to_sheets(result)
                 return result
 
             else:
@@ -189,6 +193,7 @@ class WateringController:
             result.skipped_reason = "給水タンクの水が不足しています"
             logger.warning(f"給水中止: {result.skipped_reason}")
             self._log_sensor_to_sheets(sensor_data, note="ALERT: 水不足", calibrated=calibrated)
+            self._log_watering_to_sheets(result)
             return result
 
         # --- 給水実行 ---
@@ -315,13 +320,16 @@ class WateringController:
     def _log_watering_to_sheets(self, result: WateringResult) -> None:
         if self._sheets is None:
             return
+        status = "SUCCESS" if result.success else "FAIL"
+        if not result.executed and result.skipped_reason:
+            status = f"SKIPPED: {result.skipped_reason}"
         try:
             self._sheets.append_watering_log(
                 trigger=result.trigger,
                 soil_before=result.soil_before_normalized,  # 正規化済みに変更
                 pump_duration=result.pump_duration,
                 soil_after=result.soil_after_normalized,    # 正規化済みに変更
-                result="SUCCESS" if result.success else "FAIL",
+                result=status,
             )
         except Exception as e:
             logger.error(f"Sheets 給水履歴記録失敗: {e}")
