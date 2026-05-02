@@ -206,19 +206,21 @@ class SheetsClient:
             ws = self._get_sheet("watering_log")
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            avg_before = sum(soil_before) / len(soil_before) if soil_before else 0
-            avg_after = sum(soil_after) / len(soil_after) if soil_after else 0
+            avg_before = sum(soil_before) / len(soil_before) if soil_before else None
+            avg_after = sum(soil_after) / len(soil_after) if soil_after else None
 
             row = [
                 now,
                 trigger,
-                f"{avg_before:.2f}",
+                f"{avg_before:.2f}" if avg_before is not None else "",
                 str(pump_duration),
-                f"{avg_after:.2f}",
+                f"{avg_after:.2f}" if avg_after is not None else "",
                 result,
             ]
             self._api_call_with_retry(ws.append_row, row, value_input_option="USER_ENTERED")
-            logger.info(f"給水履歴追記: {trigger} / {avg_before:.2f}→{avg_after:.2f} / {result}")
+            before_text = f"{avg_before:.2f}" if avg_before is not None else "--"
+            after_text = f"{avg_after:.2f}" if avg_after is not None else "--"
+            logger.info(f"給水履歴追記: {trigger} / {before_text}→{after_text} / {result}")
         except Exception as e:
             logger.error(f"給水履歴書き込みエラー: {e}")
 
