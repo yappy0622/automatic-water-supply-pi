@@ -119,9 +119,6 @@ class WateringController:
             logger.error(result.skipped_reason)
             self._log_sensor_to_sheets(None, note=f"ERR: {e}")
             return result
-
-        result.soil_before = sensor_data.soil
-        result.soil_before_normalized = calibrated
         
         # --- センサーキャリブレーション ---
         # 各センサー値を正規化 (0.0=乾燥, 1.0=湿潤)
@@ -135,6 +132,9 @@ class WateringController:
         for raw, (dry, wet) in zip(sensor_data.soil, params):
             calibrated.append(normalize_sensor_value(raw, dry, wet))
         
+        result.soil_before = sensor_data.soil
+        result.soil_before_normalized = calibrated
+
         avg_moisture = sum(calibrated) / len(calibrated) if calibrated else 0
         min_moisture = min(calibrated) if calibrated else 0
 
@@ -153,8 +153,16 @@ class WateringController:
             logger.info("手動給水: 閾値判定をスキップ")
         else:
             # --- 土壌湿度判定 ---
-            # soil_threshold は 0.0〜1.0 の正規化済み値
-            threshold = wc.soil_threshold          # 例: 0.35（乾燥寄り）
+            # トリガーに応じて異なる閾値を使用
+            # - AUTO (スケジュール給水): 緩い閾値で多少湿っていても給水
+            # - PERIODIC (定期実行): 通常の閾値で乾燥を判定
+            if trigger == "AUTO":
+                threshold = wc.scheduled_watering_threshold  # 例: 0.95（ほぼ常に給水）
+            elif trigger == "PERIODIC":
+                threshold = wc.soil_threshold  # 例: 0.4（通常の乾燥判定）
+            else:
+                threshold = wc.soil_threshold  # デフォルト
+            
             critical = wc.soil_critical_threshold # 例: 0.15（安全ライン）
 
             # 危険な乾燥 → 即給水
@@ -163,7 +171,7 @@ class WateringController:
                     f"危険乾燥検知: min={min_moisture:.2f} < {critical:.2f} → 強制給水"
                 )
 
-            # 通常判定（トマト向け：平均で乾燥維持）
+            # 通常判定（平均で閾値と比較）
             elif avg_moisture >= threshold:
                 result.skipped_reason = (
                     f"土壌湿度十分 (avg={avg_moisture:.2f} >= {threshold:.2f})"
@@ -213,15 +221,15 @@ class WateringController:
 
         try:
             soil_after_raw = self._arduino.read_soil()
-            result.soil_after = soil_after_raw
-            result.soil_after_normalized = calibrated_after
             
             # 給水後の値も正規化
             calibrated_after = [
                 normalize_sensor_value(raw, dry, wet)
                 for raw, (dry, wet) in zip(soil_after_raw, params)
             ]
-            
+            result.soil_after = soil_after_raw
+            result.soil_after_normalized = calibrated_after
+
             avg_after = sum(calibrated_after) / len(calibrated_after) if calibrated_after else 0
             logger.info(f"給水後の土壌湿度: 生値={soil_after_raw} → 正規化={calibrated_after} (平均={avg_after:.2f})")
 
@@ -285,7 +293,7 @@ class WateringController:
         try:
             if data:
                 self._sheets.append_sensor_log(
-                    soil_values=data.soil,
+                    soil_values=calibrated if calibrated is not None else data.soil,
                     water_ok=data.water_ok,
                     temperature=data.temperature,
                     humidity=data.humidity,

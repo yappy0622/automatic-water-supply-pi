@@ -243,22 +243,40 @@ class WateringSystem:
         """定期センサーデータ取得・記録"""
         try:
             data = self._arduino.read_all()
+            
+            # キャリブレーション
+            wc = self._cfg.watering
+            params = [
+                (wc.sensor1_dry, wc.sensor1_wet),
+                (wc.sensor2_dry, wc.sensor2_wet),
+            ]
+            from raspi.logic.watering import normalize_sensor_value
+            calibrated = [
+                normalize_sensor_value(raw, dry, wet)
+                for raw, (dry, wet) in zip(data.soil, params)
+            ]
+            
             logger.info(
-                f"[定期] 土壌={data.soil}, 水位={'OK' if data.water_ok else 'NG'}, "
+                f"[定期] 土壌={calibrated} (生値={data.soil}), "
+                f"水位={'OK' if data.water_ok else 'NG'}, "
                 f"温度={data.temperature}, 湿度={data.humidity}"
             )
 
             if self._sheets:
                 self._sheets.append_sensor_log(
-                    soil_values=data.soil,
+                    soil_values=calibrated,  # 正規化済みに変更
                     water_ok=data.water_ok,
                     temperature=data.temperature,
                     humidity=data.humidity,
                 )
 
-            # 水位不足アラート
             if not data.water_ok:
                 logger.warning("水位不足を検知!")
+
+            # --- 定期実行時の給水判定 ---
+            if self._controller:
+                logger.info("定期実行による給水判定を開始")
+                self._controller.check_and_water(trigger="PERIODIC")
 
         except ArduinoError as e:
             logger.error(f"定期センサー読み取り失敗: {e}")

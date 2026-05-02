@@ -12,6 +12,7 @@ import os
 import yaml
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional
 from copy import deepcopy
 
@@ -32,6 +33,7 @@ class ArduinoConfig:
 @dataclass
 class WateringConfig:
     soil_threshold: float = 0.4 # この値以下で「乾燥」と判定 (0.0=乾燥, 1.0=湿潤)
+    scheduled_watering_threshold: float = 0.95 # スケジュール給水時の閾値
     soil_critical_threshold: float = 0.15  # 追加
     success_moisture_delta: float = 0.02   # 追加
     pump_duration: int = 10
@@ -140,6 +142,22 @@ class ConfigManager:
             if hasattr(dc, key) and value is not None:
                 setattr(dc, key, value)
 
+    @staticmethod
+    def _normalize_watering_time(value: object) -> Optional[str]:
+        """給水時刻をスケジュール比較用の HH:MM 形式にそろえる"""
+        text = str(value).strip()
+        if not text:
+            return None
+
+        for fmt in ("%H:%M", "%H:%M:%S"):
+            try:
+                return datetime.strptime(text, fmt).strftime("%H:%M")
+            except ValueError:
+                continue
+
+        logger.warning(f"[Sheets] 無効なスケジュール時刻を無視: {text}")
+        return None
+
     # --- Spreadsheet からの設定マージ ---
 
     def merge_sheets_settings(self, sheets_data: dict) -> None:
@@ -176,8 +194,14 @@ class ConfigManager:
         if "watering_time" in sheets_data:
             time_str = str(sheets_data["watering_time"]).strip()
             if time_str:
-                s.watering_times = [t.strip() for t in time_str.split(",")]
-                logger.info(f"[Sheets] スケジュール → {s.watering_times}")
+                watering_times = [
+                    normalized
+                    for t in time_str.split(",")
+                    if (normalized := self._normalize_watering_time(t))
+                ]
+                if watering_times:
+                    s.watering_times = watering_times
+                    logger.info(f"[Sheets] スケジュール → {s.watering_times}")
 
         if "mode" in sheets_data:
             mode = str(sheets_data["mode"]).strip().upper()

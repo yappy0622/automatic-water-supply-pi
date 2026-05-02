@@ -17,6 +17,7 @@ watering:
   # 閾値は0.0〜1.0の範囲で指定 (内部で生値400→0.39として解釈)
   # 例: 0.4 = 40%以下で給水、0.5 = 50%以下で給水
   soil_threshold: 0.4        # この値以下で「乾燥」と判定 (0.0=乾燥, 1.0=湿潤)
+  scheduled_watering_threshold: 0.95 # スケジュール給水時の閾値 (この値以下で給水、例: 0.95 = ほぼ常に給水)
   soil_critical_threshold: 0.15 # これ以下は「非常に乾燥」と判定して緊急通知
   success_moisture_delta: 0.02 # 給水成功とみなす湿度の上昇量 (例: 0.02 = 2%ポイント以上の上昇)
   pump_duration: 50           # 1回の給水時間 (秒)
@@ -27,23 +28,22 @@ watering:
   # 乾燥時と湿潤時の実測値を記録することで、異なる特性のセンサーを正規化
   # 乾燥・湿潤の大小関係が逆でも正しく動作する
   sensor1_dry: 442            # センサ1 乾燥時の生値
-  sensor1_wet: 212            # センサ1 湿潤時の生値
+  sensor1_wet: 157            # センサ1 湿潤時の生値
   sensor2_dry: 5              # センサ2 乾燥時の生値
-  sensor2_wet: 144             # センサ2 湿潤時の生値
+  sensor2_wet: 98             # センサ2 湿潤時の生値
 
 # --- スケジュール ---
 schedule:
   watering_times:             # 給水判定を行う時刻 (複数指定可)
     - "07:00"
-    - "19:00"
   sensor_interval_min: 30     # センサー定期取得の間隔 (分)
-  sheets_poll_interval_min: 5 # Spreadsheet ポーリング間隔 (分)
+  sheets_poll_interval_min: 720 # Spreadsheet ポーリング間隔 (分)
 
 # --- Google Spreadsheet ---
 google_sheets:
-  enabled: false              # true にすると Sheets 連携が有効になる
+  enabled: true              # true にすると Sheets 連携が有効になる
   credentials_file: "credentials.json"   # サービスアカウントの鍵ファイル
-  spreadsheet_id: ""          # スプレッドシートID (URLの /d/XXXXX/edit のXXXXX部分)
+  spreadsheet_id: "1l_7sMvo-x-6kfLijsruiJ7dTO-5MGot-XvjECkLunRg"          # スプレッドシートID (URLの /d/XXXXX/edit のXXXXX部分)
   sheet_settings: "設定"      # 設定シート名
   sheet_sensor_log: "センサーログ"
   sheet_watering_log: "給水履歴"
