@@ -89,43 +89,55 @@ class SheetsClient:
         )
         self._client = gspread.authorize(creds)
         self._spreadsheet = self._client.open_by_key(self._spreadsheet_id)
+        
+        # 起動時にワークシートをキャッシュ
+        self._sheets_cache: dict[str, gspread.Worksheet] = {
+            key: self._spreadsheet.worksheet(name)
+            for key, name in self._sheet_names.items()
+        }
         logger.info(f"Spreadsheet 接続完了: {self._spreadsheet.title}")
 
     def _get_sheet(self, key: str) -> "gspread.Worksheet":
-        """シート名でワークシートを取得"""
-        if self._spreadsheet is None:
+        """キャッシュからワークシートを返す"""
+        if not hasattr(self, "_sheets_cache"):
             raise RuntimeError("Spreadsheet に未接続です。connect() を先に呼んでください。")
-        return self._spreadsheet.worksheet(self._sheet_names[key])
+        try:
+            return self._sheets_cache[key]
+        except KeyError:
+            raise RuntimeError(f"シートキー '{key}' が見つかりません")
+        except Exception:
+            # セッション切れの場合は再接続
+            logger.warning("ワークシートキャッシュ無効、再接続します")
+            self.connect()
+            return self._sheets_cache[key]
 
     # =========================================================================
     # 1. 設定の読み取り (スマホ → ラズパイ)
     # =========================================================================
 
     def read_settings(self) -> dict:
-        """
-        「設定」シートから全設定値を読み取る。
-
-        Returns:
-            {
-                "soil_threshold": "400",
-                "pump_duration": "10",
-                "watering_time": "07:00",
-                "mode": "AUTO",
-                "manual_trigger": "FALSE",
-                "notification_enabled": "TRUE",
-            }
-        """
         try:
             ws = self._get_sheet("settings")
+            
+            # B2:B11 を1回のAPIコールで一括取得
+            cell_range = self._api_call_with_retry(ws.get, "B2:B11")
+            
             result = {}
-            for cell_addr, key in SETTINGS_CELL_MAP.items():
-                value = ws.acell(cell_addr).value
+            cell_addrs = list(SETTINGS_CELL_MAP.keys())  # ["B2", "B3", ...]
+            keys = list(SETTINGS_CELL_MAP.values())       # ["soil_threshold", ...]
+            
+            for i, key in enumerate(keys):
+                try:
+                    value = cell_range[i][0] if i < len(cell_range) and cell_range[i] else None
+                except IndexError:
+                    value = None
                 if value is not None and str(value).strip() != "":
                     result[key] = value
+            
             logger.debug(f"Sheets 設定読み取り: {result}")
             return result
         except Exception as e:
-            logger.error(f"Sheets 設定読み取りエラー: {e}")
+            logger.error(f"Sheets 設定読み取りエラー: {e}", exc_info=True)
             return {}
 
     def reset_manual_trigger(self) -> None:
@@ -160,18 +172,18 @@ class SheetsClient:
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             row = [
                 now,
-                soil_values[0] if len(soil_values) > 0 else "",
-                soil_values[1] if len(soil_values) > 1 else "",
+                f"{soil_values[0]:.2f}" if len(soil_values) > 0 else "",  # :.2f に変更
+                f"{soil_values[1]:.2f}" if len(soil_values) > 1 else "",  # :.2f に変更
                 "1" if water_ok else "0",
                 f"{temperature:.1f}" if temperature is not None else "ERR",
                 f"{humidity:.1f}" if humidity is not None else "ERR",
                 pump_status,
                 note,
             ]
-            ws.append_row(row, value_input_option="USER_ENTERED")
+            self._api_call_with_retry(ws.append_row, row, value_input_option="USER_ENTERED")
             logger.debug(f"センサーログ追記: {row}")
         except Exception as e:
-            logger.error(f"センサーログ書き込みエラー: {e}")
+            logger.error(f"センサーログ書き込みエラー: {e}", exc_info=True) 
 
     # =========================================================================
     # 3. 給水履歴書き込み (ラズパイ → スマホ)
@@ -205,7 +217,19 @@ class SheetsClient:
                 f"{avg_after:.2f}",
                 result,
             ]
-            ws.append_row(row, value_input_option="USER_ENTERED")
+            self._api_call_with_retry(ws.append_row, row, value_input_option="USER_ENTERED")
             logger.info(f"給水履歴追記: {trigger} / {avg_before:.2f}→{avg_after:.2f} / {result}")
         except Exception as e:
             logger.error(f"給水履歴書き込みエラー: {e}")
+
+    def _api_call_with_retry(self, func, *args, **kwargs):
+        """API呼び出しを失敗時に1回再接続してリトライする"""
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger.warning(f"API呼び出し失敗、再接続してリトライ: {e}")
+            try:
+                self.connect()
+                return func(*args, **kwargs)
+            except Exception as e2:
+                raise e2
